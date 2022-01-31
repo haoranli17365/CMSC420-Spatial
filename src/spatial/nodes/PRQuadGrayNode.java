@@ -4,6 +4,7 @@ import spatial.exceptions.UnimplementedMethodException;
 import spatial.kdpoint.KDPoint;
 import spatial.knnutils.BoundedPriorityQueue;
 import spatial.knnutils.NNData;
+import spatial.trees.CentroidAccuracyException;
 import spatial.trees.PRQuadTree;
 
 import java.util.Collection;
@@ -19,7 +20,7 @@ import java.util.Collection;
  *
  * <p><b>YOU ***** MUST ***** IMPLEMENT THIS CLASS!</b></p>
  *
- *  @author --- YOUR NAME HERE! ---
+ *  @author --- Haoran Li ---
  */
 public class PRQuadGrayNode extends PRQuadNode{
 
@@ -27,7 +28,25 @@ public class PRQuadGrayNode extends PRQuadNode{
     /* ******************************************************************** */
     /* *************  PLACE ANY  PRIVATE FIELDS AND METHODS HERE: ************ */
     /* ********************************************************************** */
+    private int height;
+    private int node_counter;
+    private PRQuadNode [] successors;
 
+    public void printNode(){
+        for(PRQuadNode node : this.successors){
+            if (node instanceof PRQuadBlackNode){
+                for(KDPoint p : ((PRQuadBlackNode)node).getPoints()){
+                    for(int i = 0; i< p.coords.length;i++){
+                        System.out.print("BlackNode => " + p.coords[i] + "     ");
+                    }
+                }
+            }else if (node instanceof PRQuadGrayNode){
+                System.out.print("GreyNode   ");
+            }else{
+                System.out.println("WhiteNode   ");
+            }
+        }
+    }
     /* *********************************************************************** */
     /* ***************  IMPLEMENT THE FOLLOWING PUBLIC METHODS:  ************ */
     /* *********************************************************************** */
@@ -41,8 +60,10 @@ public class PRQuadGrayNode extends PRQuadNode{
      * @see PRQuadTree#PRQuadTree(int, int)
      */
     public PRQuadGrayNode(KDPoint centroid, int k, int bucketingParam){
-        super(centroid, k, bucketingParam); // Call to the super class' protected constructor to properly initialize the object!
-        throw new UnimplementedMethodException(); // ERASE THIS LINE AFTER YOU IMPLEMENT THIS METHOD!
+        super(centroid, k, bucketingParam); // Call to the super class' protected constructor to properly initialize the object! 
+        this.height = 1;
+        this.successors = new PRQuadNode[4]; // will be limited to 4 children per node.
+        node_counter = 0;
     }
 
 
@@ -61,7 +82,92 @@ public class PRQuadGrayNode extends PRQuadNode{
      */
     @Override
     public PRQuadNode insert(KDPoint p, int k) {
-        throw new UnimplementedMethodException(); // ERASE THIS LINE AFTER YOU IMPLEMENT THIS METHOD!
+        int boundary = (int)Math.pow(2, k-1);
+        if ((p.coords[1] >= this.centroid.coords[1] && p.coords[1] <= p.coords[1] + boundary)){
+            // target is (?, +)
+            if (p.coords[0] >= (this.centroid.coords[0] - boundary) && p.coords[0] < this.centroid.coords[0]){
+                // target is (-, +)
+                if (this.successors[0] == null){
+                    // don't have child in this branch
+                    int nextSideLength = (int)Math.pow(2,k-2);
+                    KDPoint newCentroid = new KDPoint(this.centroid.coords[0] - nextSideLength, this.centroid.coords[1] + nextSideLength);
+                    this.successors[0] = new PRQuadBlackNode(newCentroid, k-1, this.bucketingParam, p);
+                }else{
+                    this.successors[0] = this.successors[0].insert(p, k-1);
+                }
+                // Height modification
+                int NW_height = (this.successors[0] == null) ? -1 : this.successors[0].height();
+                int NE_height = (this.successors[1] == null) ? -1 : this.successors[1].height();
+                int SW_height = (this.successors[2] == null) ? -1 : this.successors[2].height();
+                int SE_height = (this.successors[3] == null) ? -1 : this.successors[3].height();
+                this.height = Math.max(NW_height, Math.max(NE_height, Math.max(SW_height, SE_height))) + 1;
+                this.node_counter++;
+                return this;
+            }else if(p.coords[0] >= this.centroid.coords[0] && p.coords[0] <= (this.centroid.coords[0] + boundary)){
+                // target is (+, +)
+                if (this.successors[1] == null){
+                    // don't have child in this branch
+                    int nextSideLength = (int)Math.pow(2,k-2);
+                    KDPoint newCentroid = new KDPoint(this.centroid.coords[0] + nextSideLength, this.centroid.coords[1] + nextSideLength);
+                    this.successors[1] = new PRQuadBlackNode(newCentroid, k-1, this.bucketingParam, p);
+                    
+                }else{
+                    this.successors[1] = this.successors[1].insert(p, k-1);
+                }
+                int NW_height = (this.successors[0] == null) ? -1 : this.successors[0].height();
+                int NE_height = (this.successors[1] == null) ? -1 : this.successors[1].height();
+                int SW_height = (this.successors[2] == null) ? -1 : this.successors[2].height();
+                int SE_height = (this.successors[3] == null) ? -1 : this.successors[3].height();
+                this.height = Math.max(NW_height, Math.max(NE_height, Math.max(SW_height, SE_height))) + 1;
+                this.node_counter ++;
+                return this;
+            }else{
+                throw new CentroidAccuracyException("Out of Bound with k = " + this.k);
+            }
+        }else if (p.coords[1] < this.centroid.coords[1] && p.coords[1] >= this.centroid.coords[1] - boundary){
+            // target is (?, -)
+            if (p.coords[0] >= (this.centroid.coords[0] - boundary) && p.coords[0] < this.centroid.coords[0]){
+                // target is (-, -)
+                if (this.successors[2] == null){
+                    // don't have child in this branch
+                    int nextSideLength = (int)Math.pow(2,k-2);
+                    KDPoint newCentroid = new KDPoint(this.centroid.coords[0] - nextSideLength, this.centroid.coords[1] - nextSideLength);
+                    this.successors[2] = new PRQuadBlackNode(newCentroid, k-1, this.bucketingParam, p);
+                }else{
+                    this.successors[2] = this.successors[2].insert(p, k-1);
+                }
+                // height modification
+                int NW_height = (this.successors[0] == null) ? -1 : this.successors[0].height();
+                int NE_height = (this.successors[1] == null) ? -1 : this.successors[1].height();
+                int SW_height = (this.successors[2] == null) ? -1 : this.successors[2].height();
+                int SE_height = (this.successors[3] == null) ? -1 : this.successors[3].height();
+                this.height = Math.max(NW_height, Math.max(NE_height, Math.max(SW_height, SE_height))) + 1;
+                this.node_counter ++;
+                return this;
+            }else if(p.coords[0] >= this.centroid.coords[0] && p.coords[0] <= (this.centroid.coords[0] + boundary)){
+                // target is (-, +)
+                if (this.successors[3] == null){
+                    // don't have child in this branch
+                    int nextSideLength = (int)Math.pow(2,k-2);
+                    KDPoint newCentroid = new KDPoint(this.centroid.coords[0] + nextSideLength, this.centroid.coords[1] - nextSideLength);
+                    this.successors[3] = new PRQuadBlackNode(newCentroid, k-1, this.bucketingParam, p);
+                }else{
+                    this.successors[3] = this.successors[3].insert(p, k-1);
+                }
+                // height modification
+                int NW_height = (this.successors[0] == null) ? -1 : this.successors[0].height();
+                int NE_height = (this.successors[1] == null) ? -1 : this.successors[1].height();
+                int SW_height = (this.successors[2] == null) ? -1 : this.successors[2].height();
+                int SE_height = (this.successors[3] == null) ? -1 : this.successors[3].height();
+                this.height = Math.max(NW_height, Math.max(NE_height, Math.max(SW_height, SE_height))) + 1;
+                this.node_counter ++;
+                return this;
+            }else{
+                throw new CentroidAccuracyException("Out of Bound with k = " + this.k);
+            }
+        }else{
+            throw new CentroidAccuracyException("Out of Bound with k = " + this.k);
+        }
     }
 
     /**
@@ -88,22 +194,236 @@ public class PRQuadGrayNode extends PRQuadNode{
      */
     @Override
     public PRQuadNode delete(KDPoint p) {
-        throw new UnimplementedMethodException(); // ERASE THIS LINE AFTER YOU IMPLEMENT THIS METHOD!
+        int currSideLength = (int)Math.pow(2, k-1);
+        if (p.coords[1] >= this.centroid.coords[1] && p.coords[1] <= p.coords[1] + currSideLength){
+            // target y value is greater than centroid.
+            if(p.coords[0] >= (this.centroid.coords[0] - currSideLength) && p.coords[0] < this.centroid.coords[0]){
+                // (-, +)
+                if(this.successors[0] == null){
+                    return this; // white node.
+                }
+                this.successors[0] = this.successors[0].delete(p);
+                this.node_counter --;
+                if (this.node_counter <= this.bucketingParam && 
+                (this.successors[0] == null || this.successors[0] instanceof PRQuadBlackNode) && 
+                (this.successors[1] == null || this.successors[1] instanceof PRQuadBlackNode) &&
+                (this.successors[2] == null || this.successors[2] instanceof PRQuadBlackNode) && 
+                (this.successors[3] == null || this.successors[3] instanceof PRQuadBlackNode)){ // Can possibly merge.
+                    // if all four nodes could be black node or white node, then merge.
+                    
+                    PRQuadBlackNode newBlackNode = new PRQuadBlackNode(centroid, k, bucketingParam);
+                    // addding all the elements into the new black node.
+                    for(PRQuadNode node : this.successors){
+                        if(node != null){ // not a white node
+                            for(KDPoint point : ((PRQuadBlackNode)node).getPoints()){
+                                newBlackNode.insert(point, k);
+                            }
+                        }
+                    }
+                    if(newBlackNode.count() == 0){
+                        return null; // white node.
+                    }
+                    this.height --;
+                    return newBlackNode;
+                    
+                }else{ // can NOT merge
+                    int NW_height = (this.successors[0] == null) ? -1 : this.successors[0].height();
+                    int NE_height = (this.successors[1] == null) ? -1 : this.successors[1].height();
+                    int SW_height = (this.successors[2] == null) ? -1 : this.successors[2].height();
+                    int SE_height = (this.successors[3] == null) ? -1 : this.successors[3].height();
+                    this.height = Math.max(NW_height, Math.max(NE_height, Math.max(SW_height, SE_height))) + 1;
+                    
+                    return this;
+                }
+            }else if(p.coords[0] >= this.centroid.coords[0] && p.coords[0] <= (this.centroid.coords[0] + currSideLength)){
+                // (+, +)
+                if(this.successors[1] == null){
+                    return this;
+                }
+                this.successors[1] = this.successors[1].delete(p);// recursively delete.
+                this.node_counter --;
+                if (this.node_counter <= this.bucketingParam && 
+                (this.successors[0] == null || this.successors[0] instanceof PRQuadBlackNode) && 
+                (this.successors[1] == null || this.successors[1] instanceof PRQuadBlackNode) &&
+                (this.successors[2] == null || this.successors[2] instanceof PRQuadBlackNode) && 
+                (this.successors[3] == null || this.successors[3] instanceof PRQuadBlackNode)){ // Can possibly merge.
+                    // if all four nodes could be black node or white node, then merge.
+                    
+                    PRQuadBlackNode newBlackNode = new PRQuadBlackNode(centroid, k, bucketingParam);
+                    // addding all the elements into the new black node.
+                    for(PRQuadNode node : this.successors){
+                        if(node != null){ // not a white node
+                            for(KDPoint point : ((PRQuadBlackNode)node).getPoints()){
+                                newBlackNode.insert(point, k);
+                            }
+                        }
+                    }
+                    if(newBlackNode.count() == 0){
+                        return null; // white node.
+                    }
+                    this.height --;
+                    return newBlackNode;
+                    
+                }else{ // can NOT merge
+                    int NW_height = (this.successors[0] == null) ? -1 : this.successors[0].height();
+                    int NE_height = (this.successors[1] == null) ? -1 : this.successors[1].height();
+                    int SW_height = (this.successors[2] == null) ? -1 : this.successors[2].height();
+                    int SE_height = (this.successors[3] == null) ? -1 : this.successors[3].height();
+                    this.height = Math.max(NW_height, Math.max(NE_height, Math.max(SW_height, SE_height))) + 1;
+                    // this.node_counter++;
+                    return this;
+                }
+            }else{
+                // target out of bound.
+                throw new CentroidAccuracyException("Out of Bound");
+            }
+        }else if(p.coords[1] < this.centroid.coords[1] && p.coords[1] >= this.centroid.coords[1] - currSideLength){
+            // target y value is lesser than centroid.
+            if(p.coords[0] >= (this.centroid.coords[0] - currSideLength) && p.coords[0] < this.centroid.coords[0]){
+                // (-, -)
+                if (this.successors[2] == null){
+                    return this;
+                }
+                this.successors[2] = this.successors[2].delete(p);// recursively delete.
+                this.node_counter --;
+                if (this.node_counter <= this.bucketingParam && 
+                (this.successors[0] == null || this.successors[0] instanceof PRQuadBlackNode) && 
+                (this.successors[1] == null || this.successors[1] instanceof PRQuadBlackNode) &&
+                (this.successors[2] == null || this.successors[2] instanceof PRQuadBlackNode) && 
+                (this.successors[3] == null || this.successors[3] instanceof PRQuadBlackNode)){ // Can possibly merge.
+                    // if all four nodes could be black node or white node, then merge.
+                    
+                    PRQuadBlackNode newBlackNode = new PRQuadBlackNode(centroid, k, bucketingParam);
+                    // addding all the elements into the new black node.
+                    for(PRQuadNode node : this.successors){
+                        if(node != null){ // not a white node
+                            for(KDPoint point : ((PRQuadBlackNode)node).getPoints()){
+                                newBlackNode.insert(point, k);
+                            }
+                        }
+                    }
+                    if(newBlackNode.count() == 0){
+                        return null; // white node.
+                    }
+                    this.height --;
+                    return newBlackNode;
+                    
+                }else{ // can NOT merge
+                    int NW_height = (this.successors[0] == null) ? -1 : this.successors[0].height();
+                    int NE_height = (this.successors[1] == null) ? -1 : this.successors[1].height();
+                    int SW_height = (this.successors[2] == null) ? -1 : this.successors[2].height();
+                    int SE_height = (this.successors[3] == null) ? -1 : this.successors[3].height();
+                    this.height = Math.max(NW_height, Math.max(NE_height, Math.max(SW_height, SE_height))) + 1;
+                    return this;
+                }
+            }else if(p.coords[0] >= this.centroid.coords[0] && p.coords[0] <= (this.centroid.coords[0] + currSideLength)){
+                // (+, -)
+                if(this.successors[3] == null){
+                    return this;
+                }
+                this.successors[3] = this.successors[3].delete(p);// recursively delete.
+                this.node_counter --;
+                if (this.node_counter <= this.bucketingParam && 
+                (this.successors[0] == null || this.successors[0] instanceof PRQuadBlackNode) && 
+                (this.successors[1] == null || this.successors[1] instanceof PRQuadBlackNode) &&
+                (this.successors[2] == null || this.successors[2] instanceof PRQuadBlackNode) && 
+                (this.successors[3] == null || this.successors[3] instanceof PRQuadBlackNode)){ // Can possibly merge.
+                    // if all four nodes could be black node or white node, then merge.
+                    
+                    PRQuadBlackNode newBlackNode = new PRQuadBlackNode(centroid, k, bucketingParam);
+                    // addding all the elements into the new black node.
+                    for(PRQuadNode node : this.successors){
+                        if(node != null){ // not a white node
+                            for(KDPoint point : ((PRQuadBlackNode)node).getPoints()){
+                                newBlackNode.insert(point, k);
+                            }
+                        }
+                    }
+                    if(newBlackNode.count() == 0){
+                        return null; // white node.
+                    }
+                    this.height --;
+                    return newBlackNode;
+                    
+                }else{ // can NOT merge
+                    int NW_height = (this.successors[0] == null) ? -1 : this.successors[0].height();
+                    int NE_height = (this.successors[1] == null) ? -1 : this.successors[1].height();
+                    int SW_height = (this.successors[2] == null) ? -1 : this.successors[2].height();
+                    int SE_height = (this.successors[3] == null) ? -1 : this.successors[3].height();
+                    this.height = Math.max(NW_height, Math.max(NE_height, Math.max(SW_height, SE_height))) + 1;
+                    return this;
+                }
+            }else{
+                // target out of bound.
+                throw new CentroidAccuracyException("Out of Bound");
+            }
+        }else{
+            // target out of bound.
+            throw new CentroidAccuracyException("Out of Bound");
+        }
     }
 
     @Override
     public boolean search(KDPoint p){
-        throw new UnimplementedMethodException(); // ERASE THIS LINE AFTER YOU IMPLEMENT THIS METHOD!
+        int currSideLength = (int)Math.pow(2,this.k-1);
+        if (p.coords[1] >= this.centroid.coords[1] && p.coords[1] <= p.coords[1] + currSideLength){
+            // target y value is greater than centroid.
+            if(p.coords[0] >= (this.centroid.coords[0] - currSideLength) && p.coords[0] < this.centroid.coords[0]){
+                // (-, +)
+                if (this.successors[0] == null){
+                    // search fail
+                    return false;
+                }else{
+                    return this.successors[0].search(p);
+                }
+            }else if (p.coords[0] >= this.centroid.coords[0] && p.coords[0] <= (this.centroid.coords[0] + currSideLength)){
+                // (+, +)
+                if (this.successors[1] == null){
+                    // search fail
+                    return false;
+                }else{
+                    return this.successors[1].search(p);
+                }
+            }else{
+                // out of bound
+                return false;
+            }
+        }else if (p.coords[1] < this.centroid.coords[1] && p.coords[1] >= this.centroid.coords[1] - currSideLength){
+            // target y value is lesser than centroid.
+            if(p.coords[0] >= (this.centroid.coords[0] - currSideLength) && p.coords[0] < this.centroid.coords[0]){
+                // (-, -)
+                if (this.successors[2] == null){
+                    // search fail
+                    return false;
+                }else{
+                    return this.successors[2].search(p);
+                }
+            }else if(p.coords[0] >= this.centroid.coords[0] && p.coords[0] <= (this.centroid.coords[0] + currSideLength)){
+                // (+, -)
+                if (this.successors[3] == null){
+                    // search fail
+                    return false;
+                }else{
+                    return this.successors[3].search(p);
+                }
+            }else{
+                // out of bound
+                return false;
+            }
+        }else{
+            // out of bound
+            return false;
+        }
     }
 
     @Override
     public int height(){
-        throw new UnimplementedMethodException(); // ERASE THIS LINE AFTER YOU IMPLEMENT THIS METHOD!
+        return this.height;
     }
 
     @Override
     public int count(){
-        throw new UnimplementedMethodException(); // ERASE THIS LINE AFTER YOU IMPLEMENT THIS METHOD!
+        return this.node_counter;
     }
 
     /**
@@ -117,23 +437,252 @@ public class PRQuadGrayNode extends PRQuadNode{
      * </ol>
      */
     public PRQuadNode[] getChildren(){
-        throw new UnimplementedMethodException(); // ERASE THIS LINE AFTER YOU IMPLEMENT THIS METHOD!
+        return this.successors;
     }
 
     @Override
-    public void range(KDPoint anchor, Collection<KDPoint> results,
-                      double range) {
-        throw new UnimplementedMethodException(); // ERASE THIS LINE AFTER YOU IMPLEMENT THIS METHOD!
+    public void range(KDPoint anchor, Collection<KDPoint> results, double range) {
+        int currSideLength = (int)Math.pow(2,this.k-1);
+        if (anchor.coords[1] >= this.centroid.coords[1] && anchor.coords[1] <= anchor.coords[1] + currSideLength){
+            // (?, +)
+            if (anchor.coords[0] >= (this.centroid.coords[0] - currSideLength) && anchor.coords[0] < this.centroid.coords[0]){
+                // (-, +)
+                if (this.successors[0] != null){
+                    this.successors[0].range(anchor, results, range);
+                }
+                for(int i = 0; i< this.successors.length; i++){
+                    if (i != 0 && this.successors[i] != null && this.successors[i].doesQuadIntersectAnchorRange(anchor, range)){ // not white node
+                        this.successors[i].range(anchor, results, range);
+                    }
+                }
+                
+            }else if(anchor.coords[0] >= this.centroid.coords[0] && anchor.coords[0] <= (this.centroid.coords[0] + currSideLength)){
+                // (+, +)
+                if (this.successors[1] != null){
+                    this.successors[1].range(anchor, results, range);
+                }
+                for(int i = 0; i< this.successors.length; i++){
+                    if (i != 1 && this.successors[i] != null && this.successors[i].doesQuadIntersectAnchorRange(anchor, range)){ // not white node
+                        this.successors[i].range(anchor, results, range);
+                    }
+                }
+            }else{
+                throw new CentroidAccuracyException("Out of Bound");
+            }
+        }else if(anchor.coords[1] < this.centroid.coords[1] && anchor.coords[1] >= this.centroid.coords[1] - currSideLength){
+            // (?, -)
+            if(anchor.coords[0] >= (this.centroid.coords[0] - currSideLength) && anchor.coords[0] < this.centroid.coords[0]){
+                // (-, -)
+                if (this.successors[2] != null){
+                    this.successors[2].range(anchor, results, range);
+                }
+                for(int i = 0; i< this.successors.length; i++){
+                    if (i != 2 && this.successors[i] != null && this.successors[i].doesQuadIntersectAnchorRange(anchor, range)){ // not white node
+                        this.successors[i].range(anchor, results, range);
+                    }
+                }
+            }else if(anchor.coords[0] >= this.centroid.coords[0] && anchor.coords[0] <= (this.centroid.coords[0] + currSideLength)){
+                // (+, -)
+                if (this.successors[3] != null){
+                    this.successors[3].range(anchor, results, range);
+                }
+                for(int i = 0; i< this.successors.length; i++){
+                    if (i != 3 && this.successors[i] != null && this.successors[i].doesQuadIntersectAnchorRange(anchor, range)){ // not white node
+                        this.successors[i].range(anchor, results, range);
+                    }
+                }
+            }else{
+                throw new CentroidAccuracyException("Out of Bound");
+            }
+        }else{
+            throw new CentroidAccuracyException("Out of Bound");
+        }
     }
 
     @Override
     public NNData<KDPoint> nearestNeighbor(KDPoint anchor, NNData<KDPoint> n)  {
-        throw new UnimplementedMethodException(); // ERASE THIS LINE AFTER YOU IMPLEMENT THIS METHOD!
+        NNHelper(anchor, n);
+        return n;
+    }
+    /**
+     * private helper method for nearest neighbor.
+     * @param anchor
+     * @param n
+     */
+    private void NNHelper(KDPoint anchor, NNData<KDPoint> n){
+        int currSideLength = (int)Math.pow(2,this.k-1);
+        if (anchor.coords[1] >= this.centroid.coords[1] && anchor.coords[1] <= anchor.coords[1] + currSideLength){
+            // (?, +)
+            if (anchor.coords[0] < this.centroid.coords[0]){
+                if(anchor.coords[0] >= (this.centroid.coords[0] - currSideLength)){
+                    // (-, +)
+                    if (this.successors[0] != null){
+                        this.successors[0].nearestNeighbor(anchor, n);
+                    }
+                    for(int i = 0; i< this.successors.length; i++){
+                        if (i != 0 && this.successors[i] != null){ // not white node
+                            if(n.getBestDist() == -1 || this.successors[i].doesQuadIntersectAnchorRange(anchor, n.getBestDist())){
+                                this.successors[i].nearestNeighbor(anchor, n);
+                            }
+                        }
+                    }
+                }else{ 
+                    // anchor is out of bound
+                    for(int i = 0; i< this.successors.length; i++){
+                        if (this.successors[i] != null){ // not white node
+                            if(n.getBestDist() == -1 || this.successors[i].doesQuadIntersectAnchorRange(anchor, n.getBestDist())){
+                                this.successors[i].nearestNeighbor(anchor, n);
+                            }
+                            
+                        }
+                    }
+                }
+                
+            }else if(anchor.coords[0] >= this.centroid.coords[0]){
+                if(anchor.coords[0] <= (this.centroid.coords[0] + currSideLength)){
+                    // (+, +)
+                    if (this.successors[1] != null){
+                        this.successors[1].nearestNeighbor(anchor, n);
+                    }
+                    for(int i = 0; i< this.successors.length; i++){
+                        if (i != 1 && this.successors[i] != null){ // not white node
+                            if(n.getBestDist() == -1 || this.successors[i].doesQuadIntersectAnchorRange(anchor, n.getBestDist())){
+                                this.successors[i].nearestNeighbor(anchor, n);
+                            }
+                        }
+                    }
+                }else{
+                    // anchor out of bound to the right.
+                    for(int i = 0; i< this.successors.length; i++){
+                        if (this.successors[i] != null){ // not white node
+                            if(n.getBestDist() == -1 || this.successors[i].doesQuadIntersectAnchorRange(anchor, n.getBestDist())){
+                                this.successors[i].nearestNeighbor(anchor, n);
+                            }
+                            
+                        }
+                    }
+                }
+                
+            }else{
+                throw new CentroidAccuracyException("Out of Bound");
+            }
+        }else if(anchor.coords[1] < this.centroid.coords[1] && anchor.coords[1] >= this.centroid.coords[1] - currSideLength){
+            // (?, -)
+            if(anchor.coords[0] < this.centroid.coords[0]){
+                if(anchor.coords[0] >= (this.centroid.coords[0] - currSideLength)){
+                    // (-, -)
+                    if (this.successors[2] != null){
+                        this.successors[2].nearestNeighbor(anchor, n);
+                    }
+                    for(int i = 0; i< this.successors.length; i++){
+                        if (i != 2 && this.successors[i] != null){ // not white node
+                            if(n.getBestDist() == -1 || this.successors[i].doesQuadIntersectAnchorRange(anchor, n.getBestDist())){
+                                this.successors[i].nearestNeighbor(anchor, n);
+                            }
+                            
+                        }
+                    }
+                }else{
+                    // anchor out of bound to the left.
+                    for(int i = 0; i< this.successors.length; i++){
+                        if (this.successors[i] != null){ // not white node
+                            if(n.getBestDist() == -1 || this.successors[i].doesQuadIntersectAnchorRange(anchor, n.getBestDist())){
+                                this.successors[i].nearestNeighbor(anchor, n);
+                            }
+                            
+                        }
+                    }
+                }
+                
+            }else if(anchor.coords[0] >= this.centroid.coords[0]){
+                if(anchor.coords[0] <= (this.centroid.coords[0] + currSideLength)){
+                    // (+, -)
+                    if (this.successors[3] != null){
+                        this.successors[3].nearestNeighbor(anchor, n);
+                    }  
+                    for(int i = 0; i< this.successors.length; i++){
+                        if (i != 3 && this.successors[i] != null ){ // not white node
+                            if(n.getBestDist() == -1 || this.successors[i].doesQuadIntersectAnchorRange(anchor, n.getBestDist())){
+                                this.successors[i].nearestNeighbor(anchor, n);
+                            }
+                        }
+                    }
+                }else{
+                    // anchor out of bound to the right.
+                    for(int i = 0; i< this.successors.length; i++){
+                        if (this.successors[i] != null){ // not white node
+                            if(n.getBestDist() == -1 || this.successors[i].doesQuadIntersectAnchorRange(anchor, n.getBestDist())){
+                                this.successors[i].nearestNeighbor(anchor, n);
+                            }
+                        }
+                    }
+                }
+                
+            }else{
+                throw new CentroidAccuracyException("Out of Bound");
+            }
+        }else{
+            throw new CentroidAccuracyException("Out of Bound");
+        }
     }
 
     @Override
     public void kNearestNeighbors(int k, KDPoint anchor, BoundedPriorityQueue<KDPoint> queue) {
-        throw new UnimplementedMethodException(); // ERASE THIS LINE AFTER YOU IMPLEMENT THIS METHOD!
+        int currSideLength = (int)Math.pow(2,this.k-1);
+        if (anchor.coords[1] >= this.centroid.coords[1] && anchor.coords[1] <= anchor.coords[1] + currSideLength){
+            // (?, +)
+            if (anchor.coords[0] >= (this.centroid.coords[0] - currSideLength) && anchor.coords[0] < this.centroid.coords[0]){
+                // (-, +)
+                if (this.successors[0] != null){
+                    this.successors[0].kNearestNeighbors(k, anchor, queue);
+                }
+                for(int i = 0; i< this.successors.length; i++){
+                    if (i != 0 && this.successors[i] != null && this.successors[i].doesQuadIntersectAnchorRange(anchor, queue.last().euclideanDistance(anchor))){ // not white node
+                        this.successors[i].kNearestNeighbors(k, anchor, queue);
+                    }
+                }
+                
+            }else if(anchor.coords[0] >= this.centroid.coords[0] && anchor.coords[0] <= (this.centroid.coords[0] + currSideLength)){
+                // (+, +)
+                if (this.successors[1] != null){
+                    this.successors[1].kNearestNeighbors(k, anchor, queue);
+                }
+                for(int i = 0; i< this.successors.length; i++){
+                    if (i != 1 && this.successors[i] != null && this.successors[i].doesQuadIntersectAnchorRange(anchor, queue.last().euclideanDistance(anchor))){ // not white node
+                        this.successors[i].kNearestNeighbors(k, anchor, queue);
+                    }
+                }
+            }else{
+                throw new CentroidAccuracyException("Out of Bound");
+            }
+        }else if(anchor.coords[1] < this.centroid.coords[1] && anchor.coords[1] >= this.centroid.coords[1] - currSideLength){
+            // (?, -)
+            if(anchor.coords[0] >= (this.centroid.coords[0] - currSideLength) && anchor.coords[0] < this.centroid.coords[0]){
+                // (-, -)
+                if (this.successors[2] != null){
+                    this.successors[2].kNearestNeighbors(k, anchor, queue);
+                }
+                for(int i = 0; i< this.successors.length; i++){
+                    if (i != 2 && this.successors[i] != null && this.successors[i].doesQuadIntersectAnchorRange(anchor, queue.last().euclideanDistance(anchor))){ // not white node
+                        this.successors[i].kNearestNeighbors(k, anchor, queue);
+                    }
+                }
+            }else if(anchor.coords[0] >= this.centroid.coords[0] && anchor.coords[0] <= (this.centroid.coords[0] + currSideLength)){
+                // (+, -)
+                if (this.successors[3] != null){
+                    this.successors[3].kNearestNeighbors(k, anchor, queue);
+                }
+                for(int i = 0; i< this.successors.length; i++){
+                    if (i != 3 && this.successors[i] != null && this.successors[i].doesQuadIntersectAnchorRange(anchor, queue.last().euclideanDistance(anchor))){ // not white node
+                        this.successors[i].kNearestNeighbors(k, anchor, queue);
+                    }
+                }
+            }else{
+                throw new CentroidAccuracyException("Out of Bound");
+            }
+        }else{
+            throw new CentroidAccuracyException("Out of Bound");
+        }
     }
 }
 

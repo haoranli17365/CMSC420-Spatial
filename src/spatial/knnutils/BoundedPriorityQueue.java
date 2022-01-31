@@ -1,8 +1,9 @@
 package spatial.knnutils;
 
+import java.util.ArrayList;
+import java.util.ConcurrentModificationException;
 import java.util.Iterator;
 
-import spatial.exceptions.UnimplementedMethodException;
 
 
 /**
@@ -23,9 +24,16 @@ public class BoundedPriorityQueue<T> implements PriorityQueue<T>{
 	/* *********************************************************************** */
 	/* *************  PLACE YOUR PRIVATE FIELDS AND METHODS HERE: ************ */
 	/* *********************************************************************** */
+	private int size;
+	private ArrayList<PriorityQueueNode<T>> queue;
+	private int insertOrder;
+	public int concurrentChangeCounter = 0;
 
-
-
+	public void printQueue(){
+		for(PriorityQueueNode<T> node : this.queue){
+			System.out.println(node.getData() +" : "+ node.getPriority());
+		}
+	}
 	/* *********************************************************************** */
 	/* ***************  IMPLEMENT THE FOLLOWING PUBLIC METHODS:  ************ */
 	/* *********************************************************************** */
@@ -36,7 +44,13 @@ public class BoundedPriorityQueue<T> implements PriorityQueue<T>{
 	 * @throws IllegalArgumentException if size is not a strictly positive integer.
 	 */
 	public BoundedPriorityQueue(int size) throws IllegalArgumentException{
-		throw new UnimplementedMethodException(); // ERASE THIS LINE AFTER YOU IMPLEMENT THIS METHOD!
+		if (size <= 0){
+			throw new IllegalArgumentException();
+		}else{
+			this.size = size;
+			this.queue = new ArrayList<>();
+			this.insertOrder = 0;
+		}
 	}
 
 	/**
@@ -51,17 +65,53 @@ public class BoundedPriorityQueue<T> implements PriorityQueue<T>{
 	 */
 	@Override
 	public void enqueue(T element, double priority) {
-		throw new UnimplementedMethodException(); // ERASE THIS LINE AFTER YOU IMPLEMENT THIS METHOD!
+		PriorityQueueNode<T> newNode = new PriorityQueueNode<>(element, priority, this.insertOrder);
+		this.insertOrder ++;
+		boolean inserted_flag = false;
+		for(int i = 0;i < this.queue.size(); i++){
+			// target should be inserted into the previous slot. 
+			if(this.queue.get(i).getPriority() > priority){
+				this.concurrentChangeCounter ++;
+				inserted_flag = true;
+				this.queue.add(i, newNode);
+				break;
+			}
+		}
+		// if the proper position is not in between the existed nodes, then simply append it to the end of the queue.
+		if (inserted_flag == false){
+			this.concurrentChangeCounter ++;
+			if(this.queue.isEmpty()){
+				this.queue.add(0,newNode);
+			}else{
+				this.queue.add(newNode);
+			}
+		}
+		// eject the last one if the size exceed the max bound.
+		if (this.queue.size() > this.size){
+			this.queue.remove(this.queue.size()-1);
+		}
 	}
 
 	@Override
 	public T dequeue() {
-		throw new UnimplementedMethodException(); // ERASE THIS LINE AFTER YOU IMPLEMENT THIS METHOD!
+		if(this.queue.size() != 0){
+			this.concurrentChangeCounter ++;
+			T deleted_data = this.queue.get(0).getData();
+			this.queue.remove(0);
+			return deleted_data;
+		}else{
+			return null;
+		}
+		
 	}
 
 	@Override
 	public T first() {
-		throw new UnimplementedMethodException(); // ERASE THIS LINE AFTER YOU IMPLEMENT THIS METHOD!
+		if(this.queue.size() == 0){
+			return null;
+		}else{
+			return this.queue.get(0).getData();
+		}
 	}
 	
 	/**
@@ -73,7 +123,11 @@ public class BoundedPriorityQueue<T> implements PriorityQueue<T>{
 	 * @return The maximum priority element in our queue, or null if the queue is empty.
 	 */
 	public T last() {
-		throw new UnimplementedMethodException(); // ERASE THIS LINE AFTER YOU IMPLEMENT THIS METHOD!
+		if (this.queue.size() == 0){
+			return null;
+		}else{
+			return this.queue.get(this.queue.size()-1).getData();
+		}
 	}
 
 	/**
@@ -81,23 +135,48 @@ public class BoundedPriorityQueue<T> implements PriorityQueue<T>{
 	 * @param element The element to search for.
 	 * @return {@code true} iff {@code element} is in {@code this}, {@code false} otherwise.
 	 */
-	public boolean contains(T element)
-	{
-		throw new UnimplementedMethodException(); // ERASE THIS LINE AFTER YOU IMPLEMENT THIS METHOD!
+	public boolean contains(T element){
+		for(PriorityQueueNode<T> curr : this.queue){
+			if (curr.equals(element)){
+				return true;
+			}
+		}
+		return false;
 	}
 
 	@Override
 	public int size() {
-		throw new UnimplementedMethodException(); // ERASE THIS LINE AFTER YOU IMPLEMENT THIS METHOD!
+		return this.queue.size();
 	}
 
 	@Override
 	public boolean isEmpty() {
-		throw new UnimplementedMethodException(); // ERASE THIS LINE AFTER YOU IMPLEMENT THIS METHOD!
+		return this.queue.size() == 0;
 	}
 
 	@Override
 	public Iterator<T> iterator() {
-		throw new UnimplementedMethodException(); // ERASE THIS LINE AFTER YOU IMPLEMENT THIS METHOD!
+		return new Iterator<>(){
+			int index = 0;
+			int changeCounter = concurrentChangeCounter;
+			@Override
+			public boolean hasNext() {
+				if (changeCounter != concurrentChangeCounter){
+					throw new ConcurrentModificationException();
+				}else{
+					return (index < queue.size());
+				}
+			}
+			@Override
+			public T next() {
+				if (changeCounter != concurrentChangeCounter){
+					throw new ConcurrentModificationException();
+				}else{
+					index++;
+					return queue.get(index-1).getData();
+				}
+			}
+
+		};
 	}
 }

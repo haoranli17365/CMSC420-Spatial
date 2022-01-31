@@ -1,6 +1,5 @@
 package spatial.nodes;
 
-import spatial.exceptions.UnimplementedMethodException;
 import spatial.kdpoint.KDPoint;
 import spatial.knnutils.BoundedPriorityQueue;
 import spatial.knnutils.NNData;
@@ -13,7 +12,7 @@ import java.util.Collection;
  *
  * <p><b>YOU ***** MUST ***** IMPLEMENT THIS CLASS!</b></p>
  *
- * @author  ---- YOUR NAME HERE! -----
+ * @author  ---- Haoran Li -----
  *
  * @see spatial.trees.KDTree
  */
@@ -31,7 +30,6 @@ public class KDTreeNode {
     /* *************  PLACE ANY OTHER PRIVATE FIELDS AND YOUR PRIVATE METHODS HERE: ************ */
     /* ************************************************************************************* */
 
-
     /* *********************************************************************** */
     /* ***************  IMPLEMENT THE FOLLOWING PUBLIC METHODS:  ************ */
     /* *********************************************************************** */
@@ -43,7 +41,10 @@ public class KDTreeNode {
      *          <b>mutable!!!</b>.
      */
     public KDTreeNode(KDPoint p){
-        throw new UnimplementedMethodException(); // ERASE THIS LINE AFTER YOU IMPLEMENT THIS METHOD!
+        this.p = new KDPoint(p);
+        this.height = 0;
+        this.left = null;
+        this.right = null;
     }
 
     /**
@@ -56,8 +57,30 @@ public class KDTreeNode {
      * @param pIn The {@link KDPoint} to insert into the node.
      * @see #delete(KDPoint, int, int)
      */
-    public  void insert(KDPoint pIn, int currDim, int dims){
-        throw new UnimplementedMethodException(); // ERASE THIS LINE AFTER YOU IMPLEMENT THIS METHOD!
+    public void insert(KDPoint pIn, int currDim, int dims){
+        if (pIn.coords[currDim] >= (this.p.coords[currDim])){
+            // traverse to the right.
+            if (this.right == null){
+                // right child is null.
+                this.right = new KDTreeNode(pIn);
+                if (this.left == null){
+                    this.height ++; // increment the height by 1
+                }
+            }else{
+                this.right.insert(pIn, ((currDim + 1) == dims ? 0 : currDim + 1), dims);
+            }
+        }else{
+             // traverse to the left
+            if (this.left == null){
+                //left child is null.
+                this.left = new KDTreeNode(pIn);
+                if (this.right == null){
+                    this.height ++; // increment the height by 1
+                }
+            }else{
+                this.left.insert(pIn, ((currDim + 1) == dims ? 0 : currDim + 1), dims);
+            }
+        }
     }
 
     /**
@@ -81,7 +104,83 @@ public class KDTreeNode {
      * @return A reference to this after the deletion takes place.
      */
     public KDTreeNode delete(KDPoint pIn, int currDim, int dims){
-        throw new UnimplementedMethodException(); // ERASE THIS LINE AFTER YOU IMPLEMENT THIS METHOD!
+
+        if (this.p.equals(pIn)){
+            if (this.left == null && this.right == null){
+                return null;
+            }else if(this.left != null && this.right == null){
+                // target node doesn't have right subtree, find the min currDim in left subtree.
+                // set left subtree to right subtree of this.
+                KDTreeNode min = this.left.findMin(currDim,((currDim + 1 == dims) ? 0 : currDim + 1),dims);
+                this.p = new KDPoint(min.p);
+                this.right = this.left;
+                this.left = null;
+                this.right = this.right.delete(new KDPoint(min.p), ((currDim + 1 == dims) ? 0 : currDim + 1), dims);
+                return this;
+            }else{
+                // either target node have right subtree and left subtree, find in-order successor.
+                KDTreeNode min = this.right.findMin(currDim, ((currDim + 1 == dims) ? 0 : currDim + 1), dims);
+                this.p = new KDPoint(min.p);
+                this.right = this.right.delete(new KDPoint(min.p), ((currDim + 1 == dims) ? 0 : currDim + 1), dims);
+                return this;
+            }
+        }else if (pIn.coords[currDim] >= this.p.coords[currDim]){
+            this.right = this.right.delete(pIn, (((currDim + 1) == dims) ? 0 : currDim + 1), dims);
+            return this;
+        }else{
+            // go to the left for searching.
+            this.left = this.left.delete(pIn, (((currDim + 1) == dims) ? 0 : currDim + 1), dims);
+            return this;
+        }
+    }
+    /**
+     * private method for finding the minimum that compare with currDim in the left subtree 
+     * @param curr
+     * @return min node
+     */
+    private KDTreeNode findMin(int targetDim, int currDim, int dims){
+        if (this == null){
+            return null;
+        }
+        if (this.left == null && this.right == null){
+            return this;
+        }
+        if (targetDim == currDim){
+            if (this.left == null){ // no more left subtree, current will be the smallest
+                return this;
+            }else{
+                return this.left.findMin(targetDim, (((currDim + 1) == dims) ? 0 : currDim + 1), dims); 
+            }
+        }
+        KDTreeNode lNode = (this.left == null)? null : this.left.findMin(targetDim, (((currDim + 1) == dims)? 0 : currDim + 1), dims);
+        KDTreeNode rNode = (this.right == null)? null : this.right.findMin(targetDim, (((currDim + 1) == dims)? 0 : currDim + 1), dims);
+        return min3(lNode, rNode, this, targetDim);
+    }
+    /**
+     *  find the minimum of current node and its left child & right child.
+     * @param leftMin
+     * @param rightMin
+     * @param curr
+     * @param targetDim
+     * @return min of three
+     */
+    private KDTreeNode min3(KDTreeNode leftMin, KDTreeNode rightMin, KDTreeNode curr, int targetDim){
+        if (leftMin != null && rightMin != null && curr != null){
+            KDTreeNode childMin = (leftMin.p.coords[targetDim] >= rightMin.p.coords[targetDim]) ? rightMin : leftMin;
+            return (childMin.p.coords[targetDim] >= this.p.coords[targetDim]) ? this : childMin;
+        }else if (leftMin == null && rightMin != null && curr != null){
+            return (rightMin.p.coords[targetDim] >= this.p.coords[targetDim]) ? this : rightMin;
+        }else if (leftMin != null && rightMin == null && curr != null){
+            return (leftMin.p.coords[targetDim] >= this.p.coords[targetDim]) ? this : leftMin;
+        }else if(leftMin != null && rightMin != null && curr == null){
+            return (leftMin.p.coords[targetDim] >= rightMin.p.coords[targetDim]) ? rightMin : leftMin;
+        }else if (leftMin == null && rightMin == null && curr != null){
+            return curr;
+        }else if(leftMin != null && rightMin == null && curr == null){
+            return leftMin;
+        }else{
+            return rightMin;
+        }
     }
 
     /**
@@ -91,8 +190,26 @@ public class KDTreeNode {
      * @param dims The total number of dimensions considered.
      * @return true iff pIn was found in the subtree rooted at this, false otherwise.
      */
-    public  boolean search(KDPoint pIn, int currDim, int dims){
-        throw new UnimplementedMethodException(); // ERASE THIS LINE AFTER YOU IMPLEMENT THIS METHOD!
+    public boolean search(KDPoint pIn, int currDim, int dims){
+        // stopping case: the target is found.
+        if (this.p.equals(pIn)){
+            return true;
+        }
+        if (pIn.coords[currDim] >= this.p.coords[currDim]){
+            // go to the right for searching.
+            if (this.right == null){
+                return false;
+            }else{
+                return this.right.search(pIn, ((currDim + 1) == dims ? 0 : currDim + 1), dims);
+            }
+        }else{
+            // go to the left for searching.
+            if (this.left == null){
+                return false;
+            }else{
+                return this.left.search(pIn, ((currDim + 1) == dims ? 0 : currDim + 1), dims);
+            }
+        }
     }
 
     /**
@@ -113,9 +230,73 @@ public class KDTreeNode {
      *              {@link KDPoint}s that satisfy our query will fall. The euclideanDistance metric used} is defined by
      *              {@link KDPoint#euclideanDistance(KDPoint)}.
      */
-    public void range(KDPoint anchor, Collection<KDPoint> results,
-                      double range, int currDim , int dims){
-        throw new UnimplementedMethodException(); // ERASE THIS LINE AFTER YOU IMPLEMENT THIS METHOD!
+    public void range(KDPoint anchor, Collection<KDPoint> results, double range, int currDim , int dims){
+        if (anchor.coords[currDim] >= this.p.coords[currDim]){
+            // go to the right for searching.
+            if (this.right == null){
+                // current node is in the range, then add it to the results list
+                if (this.is_InRange(anchor, range) && !anchor.equals(this.p)){
+                    results.add(this.p);
+                }
+                // if there is left subtree, then 
+                if (this.left != null){
+                    // check if need further search on left side (prune)
+                    if (Math.abs(this.p.coords[currDim] - anchor.coords[currDim]) <= range){
+                        // Can NOT prune, check the left side
+                        this.left.range(anchor, results, range, ((currDim + 1) == dims ? 0 : currDim + 1), dims);
+                    }
+                }  
+            }else{
+                // not reaching the greedy point
+                this.right.range(anchor, results, range, ((currDim + 1) == dims ? 0 : currDim + 1), dims);
+                // current node is in the range, then add it to the results list
+                if (this.is_InRange(anchor, range) && !anchor.equals(this.p)){
+                    results.add(this.p);
+                }
+                // if there is left subtree, then 
+                if (this.left != null){
+                    // check if need further search on left side (prune)
+                    if (Math.abs(this.p.coords[currDim] - anchor.coords[currDim]) <= range){
+                        // Can NOT prune, check the left side
+                        this.left.range(anchor, results, range, ((currDim + 1) == dims ? 0 : currDim + 1), dims);
+                    }
+                }
+            }
+        }else{
+            // go to the left for searching.
+            if (this.left == null){
+                // current node is in the range, then add it to the results list
+                if (this.is_InRange(anchor, range) && !anchor.equals(this.p)){
+                    results.add(this.p);
+                }
+                // if there is right subtree, then 
+                if (this.right != null){
+                    // check if need further search on right side (prune)
+                    if (Math.abs(this.p.coords[currDim] - anchor.coords[currDim]) <= range){
+                        // Can NOT prune, check the right side
+                        this.right.range(anchor, results, range, ((currDim + 1) == dims ? 0 : currDim + 1), dims);
+                    }
+                }
+            }else{
+                // not reaching the greedy point.
+                this.left.range(anchor, results, range, ((currDim + 1) == dims ? 0 : currDim + 1), dims);
+                // current node is in the range, then add it to the results list
+                if (this.is_InRange(anchor, range) && !anchor.equals(this.p)){
+                    results.add(this.p);
+                }
+                // if there is right subtree, then 
+                if (this.right != null){
+                    if (Math.abs(this.p.coords[currDim] - anchor.coords[currDim]) <= range){
+                        // Can NOT prune, check the right side
+                        this.right.range(anchor, results, range, ((currDim + 1) == dims ? 0 : currDim + 1), dims);
+                    }
+                }
+            }
+        }
+    }
+
+    private boolean is_InRange(KDPoint anchor, double range){
+        return (this.p.euclideanDistance(anchor) <= range);
     }
 
 
@@ -144,11 +325,85 @@ public class KDTreeNode {
      * @see NNData
      * @see #kNearestNeighbors(int, KDPoint, BoundedPriorityQueue, int, int)
      */
-    public  NNData<KDPoint> nearestNeighbor(KDPoint anchor, int currDim,
-                                            NNData<KDPoint> n, int dims){
-        throw new UnimplementedMethodException(); // ERASE THIS LINE AFTER YOU IMPLEMENT THIS METHOD!
+    public NNData<KDPoint> nearestNeighbor(KDPoint anchor, int currDim, NNData<KDPoint> n, int dims){
+        // n = new NNData<KDPoint>(this.p, this.p.euclideanDistance(anchor));
+        NNHelper(anchor, currDim, n, dims);
+        return n;
     }
-
+    /**
+     * Nearest Neighbor helper method
+     * @param anchor
+     * @param currDim
+     * @param n
+     * @param dims
+     */
+    private void NNHelper(KDPoint anchor, int currDim, NNData<KDPoint> n, int dims){
+        if (anchor.coords[currDim] >= this.p.coords[currDim]){
+            if (this.right == null){
+                double currDistance = this.p.euclideanDistance(anchor);
+                // current node has shorter distance, then add it to the results list
+                if ((n.getBestDist() == -1 ||currDistance <= n.getBestDist()) && !anchor.equals(this.p)){
+                    n.update(this.p, currDistance);
+                }
+                // if there is left subtree, then 
+                if (this.left != null){
+                    // check if need further search on left side (prune)
+                    if (this.left.p.euclideanDistance(anchor) <= n.getBestDist()){
+                        // Can NOT prune, check the left side
+                        this.left.NNHelper(anchor, ((currDim + 1) == dims ? 0 : currDim + 1), n, dims);
+                    }
+                }
+            }else{
+                // if current is the shortest so far, set it to the best
+                double currDistance = this.p.euclideanDistance(anchor);
+                if ((n.getBestDist() == -1 ||currDistance <= n.getBestDist()) && !anchor.equals(this.p)){
+                    n.update(this.p, currDistance);
+                }
+                // trverse to the right
+                this.right.NNHelper(anchor,((currDim + 1) == dims ? 0 : currDim + 1), n, dims);
+                // if there is left subtree, then 
+                if (this.left != null){
+                    // check if need further search on left side (prune)
+                    if (this.left.p.euclideanDistance(anchor) <= n.getBestDist()){
+                        // Can NOT prune, check the left side
+                        this.left.NNHelper(anchor, ((currDim + 1) == dims ? 0 : currDim + 1), n, dims);
+                    }
+                }
+            }
+        }else{
+            if (this.left == null){
+                double currDistance = this.p.euclideanDistance(anchor);
+                if ((n.getBestDist() == -1 ||currDistance <= n.getBestDist()) && !anchor.equals(this.p)){
+                    n.update(this.p, currDistance);
+                }
+                // if there is right subtree, then 
+                if (this.right != null){
+                    // check if need further search on right side (prune)
+                    if (this.right.p.euclideanDistance(anchor) <= n.getBestDist()){
+                        // Can NOT prune, check the right side
+                        this.right.NNHelper(anchor, ((currDim + 1) == dims ? 0 : currDim + 1), n, dims);
+                    }
+                }
+            }else{
+                // if current is the shortest so far, set it to the best
+                double currDistance = this.p.euclideanDistance(anchor);
+                if ((n.getBestDist() == -1 ||currDistance <= n.getBestDist()) && !anchor.equals(this.p)){
+                    n.update(this.p, currDistance);
+                }
+                // traverse to the left.
+                this.left.NNHelper(anchor,((currDim + 1) == dims ? 0 : currDim + 1), n, dims); 
+                // if there is right subtree, then 
+                if (this.right != null){
+                    // check if need further search on right side (prune)
+                    if (this.right.p.euclideanDistance(anchor) <= n.getBestDist()){
+                        // Can NOT prune, check the right side
+                        this.right.NNHelper(anchor, ((currDim + 1) == dims ? 0 : currDim + 1), n, dims);
+                    }
+                }
+            }
+        }
+    }
+    
     /**
      * <p>Executes a nearest neighbor query, which returns the nearest neighbor, in terms of
      * {@link KDPoint#euclideanDistance(KDPoint)}, from the &quot;anchor&quot; point.</p>
@@ -176,8 +431,94 @@ public class KDTreeNode {
      *
      * @see BoundedPriorityQueue
      */
-    public  void kNearestNeighbors(int k, KDPoint anchor, BoundedPriorityQueue<KDPoint> queue, int currDim, int dims){
-        throw new UnimplementedMethodException(); // ERASE THIS LINE AFTER YOU IMPLEMENT THIS METHOD!
+    public void kNearestNeighbors(int k, KDPoint anchor, BoundedPriorityQueue<KDPoint> queue, int currDim, int dims){
+        if (anchor.coords[currDim] >= this.p.coords[currDim]){// search to the right
+            if (this.right == null){
+                // reach the greedy point, check the greedy point.
+                if(!this.p.equals(anchor)){
+                    // if greedy point is NOT anchor.
+                    queue.enqueue(this.p, this.p.euclideanDistance(anchor));
+                }
+
+                // check if pruning is needed for the left side of current.
+                if (this.left != null){
+                    // Go to the left side.
+                    if (queue.size() != k){
+                        // queue is NOT full, then go to the left side to fill in all the space in queue.
+                        this.left.kNearestNeighbors(k, anchor, queue, ((currDim + 1) == dims ? 0 : currDim + 1), dims);
+                    }else{
+                        if(queue.last().euclideanDistance(anchor) >= this.left.p.euclideanDistance(anchor)){
+                            // queue is full, but left child have shorter or equal distance than the last in the queue.
+                            this.left.kNearestNeighbors(k, anchor, queue, ((currDim + 1) == dims ? 0 : currDim + 1), dims);
+                        }
+                    }
+                }
+            }else{
+                // if current is NOT anchor, add current to comapre with those that already in the queue.
+                if(!this.p.equals(anchor)){
+                    queue.enqueue(this.p, this.p.euclideanDistance(anchor));
+                }
+                // not reaching the greedy point
+                this.right.kNearestNeighbors(k, anchor, queue, ((currDim + 1) == dims ? 0 : currDim + 1), dims);
+                
+                // check if pruning is needed for the left side of current.(when backtracking)
+                if (this.left != null){
+                    // Go to the left side.
+                    if (queue.size() != k){
+                        // queue is NOT full, then go to the left side to check.
+                        this.left.kNearestNeighbors(k, anchor, queue, ((currDim + 1) == dims ? 0 : currDim + 1), dims);
+                    }else{
+                        if(queue.last().euclideanDistance(anchor) >= this.left.p.euclideanDistance(anchor)){
+                            // queue is full, but left child have shorter or equal distance than the last in the queue.
+                            this.left.kNearestNeighbors(k, anchor, queue, ((currDim + 1) == dims ? 0 : currDim + 1), dims);
+                        }
+                    }
+                }
+            }
+        }else{// search to the left
+            if (this.left == null){
+                // reach the greedy point, check the greedy point.
+                if(!this.p.equals(anchor)){
+                    // if greedy point is not anchor.
+                    queue.enqueue(this.p, this.p.euclideanDistance(anchor));
+                }
+                // if right side have subtree , check if pruning is needed.
+                if (this.right != null){
+                    // Go to the right side.
+                    if (queue.size() != k){
+                        // queue is NOT full, then go to the right side to check.
+                        this.right.kNearestNeighbors(k, anchor, queue, ((currDim + 1) == dims ? 0 : currDim + 1), dims);
+                    }else{
+                        if(queue.last().euclideanDistance(anchor) >= this.right.p.euclideanDistance(anchor)){
+                            // queue is full, but right child have shorter or equal distance than the last in the queue.
+                            this.right.kNearestNeighbors(k, anchor, queue, ((currDim + 1) == dims ? 0 : currDim + 1), dims);
+                        }
+                    }
+                }
+            }else{
+                // add current to comapre with those that already in the queue.
+                if(!this.p.equals(anchor)){
+                    queue.enqueue(this.p, this.p.euclideanDistance(anchor));
+                }
+            
+                // not reaching the greedy point, keep traversing.
+                this.left.kNearestNeighbors(k, anchor, queue, ((currDim + 1) == dims ? 0 : currDim + 1), dims);
+
+                // if right side have subtree , check if pruning is needed.(when backtracking)
+                if (this.right != null){
+                    // Go to the right side.
+                    if (queue.size() != k){
+                        // queue is NOT full, then go to the right side to check.
+                        this.right.kNearestNeighbors(k, anchor, queue, ((currDim + 1) == dims ? 0 : currDim + 1), dims);
+                    }else{
+                        if(queue.last().euclideanDistance(anchor) >= this.right.p.euclideanDistance(anchor)){
+                            // queue is full, but right child have shorter or equal distance than the last in the queue.
+                            this.right.kNearestNeighbors(k, anchor, queue, ((currDim + 1) == dims ? 0 : currDim + 1), dims);
+                        }
+                    }
+                }
+            }
+        }
     }
 
     /**
@@ -189,7 +530,19 @@ public class KDTreeNode {
      * @return the height of the subtree rooted at the current node.
      */
     public int height(){
-        throw new UnimplementedMethodException(); // ERASE THIS LINE AFTER YOU IMPLEMENT THIS METHOD!
+        return heightHelper(this);
+    }
+
+    private int heightHelper(KDTreeNode curr){
+        if (curr == null){
+            return -1;
+        }else{
+            if (curr.left == null && curr.right == null){
+                return 0;
+            }else{
+                return Math.max(heightHelper(curr.left), heightHelper(curr.right)) + 1;
+            }
+        }
     }
 
     /**
@@ -198,14 +551,14 @@ public class KDTreeNode {
      * @return The {@link KDPoint} held inside this.
      */
     public KDPoint getPoint(){
-        throw new UnimplementedMethodException(); // ERASE THIS LINE AFTER YOU IMPLEMENT THIS METHOD!
+        return new KDPoint(this.p);
     }
 
     public KDTreeNode getLeft(){
-        throw new UnimplementedMethodException(); // ERASE THIS LINE AFTER YOU IMPLEMENT THIS METHOD!
+        return this.left;
     }
 
     public KDTreeNode getRight(){
-        throw new UnimplementedMethodException(); // ERASE THIS LINE AFTER YOU IMPLEMENT THIS METHOD!
+        return this.right;
     }
 }

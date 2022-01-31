@@ -107,18 +107,20 @@ public class StudentTests {
         assertEquals("After enqueueing a single KDPoint in a BPQ instance with a capacity of 1, a call to dequeue() did not return " +
                 "the point itself.", ZERO, myQueue.dequeue());
     }
-
+    
     @Test
     public void testBPQComplexEnqueueDequeueFirstAndLast() {
         BoundedPriorityQueue<KDPoint> myQueue = new BoundedPriorityQueue<>(3);
         myQueue.enqueue(ZERO, 2.3);
         myQueue.enqueue(ONEONE, 1.1);
+        
         assertEquals("After enqueueing two KDPoints in a BPQ instance with a capacity of 3, a call to first() did not return " +
                 "the expected point.", ONEONE, myQueue.first());
         assertEquals("After enqueueing two KDPoints in a BPQ instance with a capacity of 3, a call to last() did not return " +
                 "the expected point.", ZERO, myQueue.last());
         assertEquals("After enqueueing two KDPoints in a BPQ instance with a capacity of 3, a call to dequeu() did not return " +
                 "the expected point.", ONEONE, myQueue.dequeue());
+
         myQueue.enqueue(MINUSONEMINUSONE, 4);
         assertEquals("After enqueueing two KDPoints in a BPQ instance with a capacity of 3, dequeuing one and enqueuing another, " +
                 "a call to last() did not return the expected point.", MINUSONEMINUSONE, myQueue.last());
@@ -166,7 +168,6 @@ public class StudentTests {
         kdTree.insert(new KDPoint(10, 30));
         kdTree.insert(new KDPoint(12, 18));
         kdTree.insert(new KDPoint(-20, 300));
-
         assertEquals("The first point inserted should be our root.", new KDPoint(10, 30), kdTree.getRoot());
         assertEquals("The height of this KD-Tree should be 1.", 1, kdTree.height());
         assertEquals("The number of nodes in this tree should be 3.", 3, kdTree.count());
@@ -187,6 +188,32 @@ public class StudentTests {
         }
     }
 
+    @Test
+    public void testKDTreeNN() {
+        KDTree kdTree = new KDTree(1);
+        kdTree.insert(new KDPoint(9));
+        kdTree.insert(new KDPoint(3));
+        kdTree.insert(new KDPoint(5));
+        kdTree.insert(new KDPoint(16));
+        kdTree.insert(new KDPoint(15));
+        kdTree.insert(new KDPoint(25));
+        
+        assertEquals(new KDPoint(5), kdTree.nearestNeighbor(new KDPoint(9)));
+    }
+
+    @Test
+    public void testKDTreeKNN() {
+        KDTree kdTree = new KDTree(1);
+        kdTree.insert(new KDPoint(9));
+        kdTree.insert(new KDPoint(3));
+        kdTree.insert(new KDPoint(5));
+        kdTree.insert(new KDPoint(16));
+        kdTree.insert(new KDPoint(15));
+        kdTree.insert(new KDPoint(25));
+        
+        assertEquals(new KDPoint(15), kdTree.kNearestNeighbors(1, new KDPoint(16)).first());
+    }
+
 
     /* ******************************************************************************************************** */
     /* ******************************************************************************************************** */
@@ -199,7 +226,46 @@ public class StudentTests {
         assertTrue("A freshly created PR-QuadTree should be empty!", prQuadTree.isEmpty());
     }
 
+    @Test
+    public void testPRQInsertion(){
+        prQuadTree = new PRQuadTree(6, 2); // 64, with each quadrant 32
+        prQuadTree.insert(new KDPoint(-1, 1));
+        prQuadTree.insert(new KDPoint(1, 1));
+        prQuadTree.insert(new KDPoint(-1, -1));
+        prQuadTree.insert(new KDPoint(1, -1));
+        assertEquals(4, prQuadTree.count());
+        assertEquals(1, prQuadTree.height());
+        prQuadTree.insert(new KDPoint(-6, 6)); // (-, +)
+        assertEquals(5, prQuadTree.count());
+        assertEquals(1, prQuadTree.height());
+        prQuadTree.insert(new KDPoint(6,6)); //(+, +)
+        assertEquals(6, prQuadTree.count());
+        assertEquals(1, prQuadTree.height());
+        prQuadTree.insert(new KDPoint(-6, -6)); // (-, -)
+        assertEquals(7, prQuadTree.count());
+        assertEquals(1, prQuadTree.height());
+        prQuadTree.insert(new KDPoint(6, -6)); // (+, -)
+        assertEquals(8, prQuadTree.count());
+        assertEquals(1, prQuadTree.height());
+        
+        prQuadTree.insert(new KDPoint(32, 32));
+    }
 
+    @Test
+    public void testPRQuadNN(){
+        prQuadTree = new PRQuadTree(4, 2); // 16, each quarant has side length 8
+        prQuadTree.insert(new KDPoint(-1, 1));
+        prQuadTree.insert(new KDPoint(1, 1));
+        prQuadTree.insert(new KDPoint(-1, -1));
+        prQuadTree.insert(new KDPoint(1, -1));
+        prQuadTree.insert(new KDPoint(-6, 6)); // (-, +)
+        prQuadTree.insert(new KDPoint(6,6)); //(+, +)
+        prQuadTree.insert(new KDPoint(-6, -6)); // (-, -)
+        prQuadTree.insert(new KDPoint(6, -6)); // (+, -)
+        KDPoint nn;
+        nn = prQuadTree.nearestNeighbor(new KDPoint(15, 6));
+        assertEquals(new KDPoint(6, 6), nn);
+    }
     @Test
     public void testPRQSimpleQuadTree(){
         prQuadTree = new PRQuadTree(4, 2); // Space from (-8, -8) to (8, 8), bucketing parameter = 2.
@@ -262,6 +328,7 @@ public class StudentTests {
         BoundedPriorityQueue<KDPoint> knnPoints = prQuadTree.kNearestNeighbors(kNN,queryPt);
         assertEquals("Expected KNN result to have "+expectedKnnPoints.size()+" elements but it actually have "+knnPoints.size()+ " elements"
                 ,expectedKnnPoints.size(),knnPoints.size());
+        knnPoints.printQueue();
         KDPoint actualPoint;
         for (int i=0;i<kNN;i++)
         {
